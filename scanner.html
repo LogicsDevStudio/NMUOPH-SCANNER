@@ -14,11 +14,32 @@
     color: #fff;
     text-align: center;
   }
-  h3 { margin-top: 0; }
-  #reader { max-width: 480px; margin: 16px auto 0; border-radius: 8px; overflow: hidden; }
-  #status { margin-top: 16px; font-size: 16px; min-height: 24px; }
-  .err { color: #ff6b6b; }
-  .ok { color: #51cf66; }
+  h3 { margin-top: 0; margin-bottom: 4px; }
+  #counter { font-size: 14px; color: #9ca3af; margin-bottom: 12px; }
+  #reader { max-width: 480px; margin: 0 auto; border-radius: 8px; overflow: hidden; }
+  #status {
+    margin-top: 14px;
+    font-size: 17px;
+    font-weight: 600;
+    min-height: 28px;
+    padding: 10px;
+    border-radius: 8px;
+    transition: background 0.2s ease;
+  }
+  .status-idle { color: #9ca3af; }
+  .status-busy { color: #60a5fa; }
+  .status-ok { background: #064e3b; color: #6ee7b7; }
+  .status-err { background: #7f1d1d; color: #fca5a5; }
+  #log {
+    max-width: 480px;
+    margin: 12px auto 0;
+    text-align: left;
+    font-size: 13px;
+    color: #9ca3af;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  #log div { padding: 4px 0; border-bottom: 1px solid #222; }
   button {
     font-size: 16px;
     padding: 12px 24px;
@@ -27,6 +48,7 @@
     background: #10b981;
     color: #fff;
     cursor: pointer;
+    margin: 4px;
   }
   button:active { transform: translateY(1px); }
   button.stop { background: #f59e0b; }
@@ -35,32 +57,48 @@
 </head>
 <body>
   <h3>📷 สแกน QR Code เพื่อแจกแสตมป์</h3>
+  <div id="counter">ยังไม่ได้สแกน</div>
   <button id="startBtn" onclick="startScan()">เริ่มสแกน QR</button>
   <button id="stopBtn" class="stop hidden" onclick="stopScan()">หยุดสแกน</button>
   <div id="reader"></div>
-  <div id="status"></div>
+  <div id="status" class="status-idle"></div>
+  <div id="log"></div>
 
   <script>
     const statusEl = document.getElementById('status');
+    const counterEl = document.getElementById('counter');
+    const logEl = document.getElementById('log');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
+
     let scanner = null;
     let isScanning = false;
+    let successCount = 0;
 
-    function sendResultAndClose(qrText) {
-      if (window.opener) {
-        // ส่งค่ากลับไปยังหน้า Apps Script ที่เปิดหน้าต่างนี้ขึ้นมา
-        window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
-      }
-      statusEl.innerHTML = '<span class="ok">✔ สแกนสำเร็จ กำลังปิดหน้าต่าง...</span>';
-      setTimeout(() => window.close(), 700);
+    // กันสแกนโค้ดเดิมซ้ำถี่ๆ ขณะ QR ยังค้างอยู่หน้ากล้อง (เช่นคนยังไม่ทันเอาบัตรออก)
+    let lastCode = null;
+    let lastCodeTime = 0;
+    const SAME_CODE_COOLDOWN_MS = 4000;
+    // กันการยิงซ้อนระหว่างรอผลลัพธ์จากแอปหลัก
+    let awaitingResult = false;
+
+    function setStatus(text, cls) {
+      statusEl.textContent = text;
+      statusEl.className = cls;
+    }
+
+    function addLog(text, ok) {
+      const line = document.createElement('div');
+      line.textContent = (ok ? '✔ ' : '✘ ') + text;
+      line.style.color = ok ? '#6ee7b7' : '#fca5a5';
+      logEl.prepend(line);
     }
 
     function startScan() {
       if (isScanning) return;
       startBtn.classList.add('hidden');
       stopBtn.classList.remove('hidden');
-      statusEl.textContent = 'กำลังขอสิทธิ์กล้อง...';
+      setStatus('กำลังขอสิทธิ์กล้อง...', 'status-busy');
 
       scanner = new Html5Qrcode("reader");
       isScanning = true;
@@ -69,13 +107,25 @@
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (qrText) => {
-          try { scanner.stop(); } catch (e) {}
-          isScanning = false;
-          sendResultAndClose(qrText);
+          const now = Date.now();
+          if (awaitingResult) return; // กำลังรอผลลัพธ์ใบก่อนหน้าอยู่
+          if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return; // โค้ดเดิมซ้ำในช่วงสั้นๆ
+
+          lastCode = qrText;
+          lastCodeTime = now;
+          awaitingResult = true;
+
+          setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
+          if (window.opener) {
+            window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
+          } else {
+            setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
+            awaitingResult = false;
+          }
         },
-        (err) => { /* เฟรมที่สแกนไม่เจอ ปกติ */ }
+        (err) => { /* เฟรมที่สแกนไม่เจอ ปกติ ไม่ต้องทำอะไร */ }
       ).then(() => {
-        statusEl.textContent = '';
+        setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
       }).catch(err => {
         isScanning = false;
         startBtn.classList.remove('hidden');
@@ -90,7 +140,7 @@
         } else {
           msg += (err && err.message) ? err.message : err;
         }
-        statusEl.innerHTML = '<span class="err">' + msg + '</span>';
+        setStatus(msg, 'status-err');
       });
     }
 
@@ -101,7 +151,28 @@
         scanner.stop().then(() => { try { scanner.clear(); } catch(e){} }).catch(() => {});
       }
       isScanning = false;
+      setStatus('หยุดสแกนแล้ว', 'status-idle');
     }
+
+    // รับผลลัพธ์ย้อนกลับจากแอปหลัก (สำเร็จ/ไม่สำเร็จ) เพื่อโชว์ในหน้าต่างนี้เลย ไม่ต้องสลับหน้าจอ
+    window.addEventListener('message', (event) => {
+      if (!event.data || event.data.type !== 'scan-feedback') return;
+      awaitingResult = false;
+
+      if (event.data.success) {
+        successCount++;
+        counterEl.textContent = 'สแกนสำเร็จแล้ว ' + successCount + ' คน';
+        setStatus('✔ ' + event.data.message, 'status-ok');
+      } else {
+        setStatus('✘ ' + event.data.message, 'status-err');
+      }
+      addLog(event.data.message, event.data.success);
+
+      // เคลียร์สถานะกลับเป็นพร้อมสแกน หลังโชว์ผลไว้สักครู่ (กล้องยังทำงานต่อเนื่องตลอด ไม่หยุด)
+      setTimeout(() => {
+        if (isScanning) setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
+      }, 1800);
+    });
 
     window.addEventListener('beforeunload', () => { if (isScanning) stopScan(); });
   </script>
