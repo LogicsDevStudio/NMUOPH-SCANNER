@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สแกน QR Code</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #111;
+    color: #fff;
+    text-align: center;
+  }
+  h3 { margin-top: 0; }
+  #reader { max-width: 480px; margin: 16px auto 0; border-radius: 8px; overflow: hidden; }
+  #status { margin-top: 16px; font-size: 16px; min-height: 24px; }
+  .err { color: #ff6b6b; }
+  .ok { color: #51cf66; }
+  button {
+    font-size: 16px;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    background: #10b981;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:active { transform: translateY(1px); }
+  button.stop { background: #f59e0b; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <h3>📷 สแกน QR Code เพื่อแจกแสตมป์</h3>
+  <button id="startBtn" onclick="startScan()">เริ่มสแกน QR</button>
+  <button id="stopBtn" class="stop hidden" onclick="stopScan()">หยุดสแกน</button>
+  <div id="reader"></div>
+  <div id="status"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    let scanner = null;
+    let isScanning = false;
+
+    function sendResultAndClose(qrText) {
+      if (window.opener) {
+        // ส่งค่ากลับไปยังหน้า Apps Script ที่เปิดหน้าต่างนี้ขึ้นมา
+        window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
+      }
+      statusEl.innerHTML = '<span class="ok">✔ สแกนสำเร็จ กำลังปิดหน้าต่าง...</span>';
+      setTimeout(() => window.close(), 700);
+    }
+
+    function startScan() {
+      if (isScanning) return;
+      startBtn.classList.add('hidden');
+      stopBtn.classList.remove('hidden');
+      statusEl.textContent = 'กำลังขอสิทธิ์กล้อง...';
+
+      scanner = new Html5Qrcode("reader");
+      isScanning = true;
+
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (qrText) => {
+          try { scanner.stop(); } catch (e) {}
+          isScanning = false;
+          sendResultAndClose(qrText);
+        },
+        (err) => { /* เฟรมที่สแกนไม่เจอ ปกติ */ }
+      ).then(() => {
+        statusEl.textContent = '';
+      }).catch(err => {
+        isScanning = false;
+        startBtn.classList.remove('hidden');
+        stopBtn.classList.add('hidden');
+        let msg = 'เปิดกล้องไม่สำเร็จ: ';
+        if (err.name === 'NotAllowedError') {
+          msg = 'คุณปฏิเสธสิทธิ์กล้อง หรือเบราว์เซอร์ตั้งค่าบล็อกไว้ กรุณาอนุญาตกล้องแล้วลองใหม่';
+        } else if (err.name === 'NotFoundError') {
+          msg = 'ไม่พบกล้องบนอุปกรณ์นี้';
+        } else if (err.name === 'NotReadableError') {
+          msg = 'กล้องกำลังถูกใช้งานโดยแอปอื่นอยู่';
+        } else {
+          msg += (err && err.message) ? err.message : err;
+        }
+        statusEl.innerHTML = '<span class="err">' + msg + '</span>';
+      });
+    }
+
+    function stopScan() {
+      startBtn.classList.remove('hidden');
+      stopBtn.classList.add('hidden');
+      if (scanner && isScanning) {
+        scanner.stop().then(() => { try { scanner.clear(); } catch(e){} }).catch(() => {});
+      }
+      isScanning = false;
+    }
+
+    window.addEventListener('beforeunload', () => { if (isScanning) stopScan(); });
+  </script>
+</body>
+</html>
