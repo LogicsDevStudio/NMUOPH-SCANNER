@@ -42,6 +42,19 @@
   .status-busy { color: #60a5fa; }
   .status-ok { background: #064e3b; color: #6ee7b7; }
   .status-err { background: #7f1d1d; color: #fca5a5; }
+  #scanDetail {
+    max-width: 480px;
+    margin: 10px auto 0;
+    background: #064e3b;
+    border: 1px solid #10b981;
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 14px;
+    color: #d1fae5;
+  }
+  #scanDetail div { padding: 2px 0; }
+  #scanDetail b { color: #fff; }
   #log {
     max-width: 480px;
     margin: 12px auto 0;
@@ -75,6 +88,7 @@
   <button id="stopBtn" class="stop hidden" onclick="stopScan()">หยุดสแกน</button>
   <div id="reader"></div>
   <div id="status" class="status-idle"></div>
+  <div id="scanDetail" class="hidden"></div>
   <div id="log"></div>
 
   <script>
@@ -84,6 +98,22 @@
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const contextInfoEl = document.getElementById('contextInfo');
+    const detailEl = document.getElementById('scanDetail');
+
+    // แสดงข้อมูลคนที่เพิ่งได้รับแสตมป์ (เลขบัตร / ชื่อ-นามสกุล / เวลาที่ได้รับ) ใต้กล่องแจ้งเตือน
+    function renderDetail(d) {
+      const fullName = [d.firstName, d.lastName].filter(Boolean).join(' ');
+      let html = '';
+      if (d.natId) html += '<div>🪪 เลขบัตร: <b>' + d.natId + '</b></div>';
+      if (fullName) html += '<div>👤 ชื่อ-นามสกุล: <b>' + fullName + '</b></div>';
+      if (d.receivedAt) html += '<div>🕒 ได้รับเมื่อ: <b>' + d.receivedAt + '</b></div>';
+      if (html) {
+        detailEl.innerHTML = html;
+        detailEl.classList.remove('hidden');
+      } else {
+        detailEl.classList.add('hidden');
+      }
+    }
 
     // แสดงชื่ออีเวนต์/บูธที่กำลังแจกแต้มอยู่ ให้เจ้าหน้าที่รู้ว่ากำลังสแกนให้อะไรอยู่
     function renderContext(eventName, boothName) {
@@ -145,6 +175,7 @@
           awaitingResult = true;
 
           setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
+          detailEl.classList.add('hidden'); // ซ่อนข้อมูลของคนก่อนหน้า รอผลของคนใหม่
           if (window.opener) {
             window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
           } else {
@@ -200,8 +231,10 @@
         successCount++;
         counterEl.textContent = 'สแกนสำเร็จแล้ว ' + successCount + ' คน';
         setStatus('✔ ' + event.data.message, 'status-ok');
+        renderDetail(event.data);
       } else {
         setStatus('✘ ' + event.data.message, 'status-err');
+        detailEl.classList.add('hidden');
       }
       addLog(event.data.message, event.data.success);
 
