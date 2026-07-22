@@ -5,91 +5,140 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>สแกน QR Code</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<!-- เพิ่ม Google Font Prompt เพื่อความทันสมัย -->
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   body {
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Prompt', sans-serif;
     margin: 0;
-    padding: 16px;
-    background: #111;
-    color: #fff;
+    padding: 20px 16px;
+    background-color: #f8fafc;
+    /* เพิ่มลวดลายกราฟิก Gradient Mesh สไตล์ Modern Minimalist */
+    background-image: 
+      radial-gradient(at 10% 20%, hsla(228,100%,74%,0.15) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsla(189,100%,56%,0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(355,100%,93%,0.15) 0px, transparent 50%);
+    color: #334155;
     text-align: center;
+    min-height: 100vh;
   }
-  h3 { margin-top: 0; margin-bottom: 4px; }
+  
+  /* สร้าง Container สไตล์ Glassmorphism */
+  .scanner-container {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 24px;
+    padding: 24px 16px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  h3 { margin-top: 0; margin-bottom: 8px; color: #1e293b; font-weight: 600; }
+  
   #contextInfo {
     font-size: 13px;
-    color: #d1d5db;
-    background: #1f2937;
-    border: 1px solid #374151;
-    border-radius: 6px;
-    padding: 6px 12px;
-    margin: 0 auto 10px;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 8px 16px;
+    margin: 0 auto 12px;
     display: inline-block;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
   }
-  #contextInfo b { color: #34d399; }
+  #contextInfo b { color: #3b82f6; }
   #contextInfo:empty { display: none; }
-  #counter { font-size: 14px; color: #9ca3af; margin-bottom: 12px; }
-  #reader { max-width: 480px; margin: 0 auto; border-radius: 8px; overflow: hidden; }
-  #status {
-    margin-top: 14px;
-    font-size: 17px;
-    font-weight: 600;
-    min-height: 28px;
-    padding: 10px;
-    border-radius: 8px;
-    transition: background 0.2s ease;
+  
+  #counter { font-size: 14px; color: #64748b; margin-bottom: 16px; font-weight: 500; }
+  
+  #reader { 
+    max-width: 100%; 
+    margin: 0 auto; 
+    border-radius: 16px; 
+    overflow: hidden; 
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    border: 2px solid #fff;
   }
-  .status-idle { color: #9ca3af; }
-  .status-busy { color: #60a5fa; }
-  .status-ok { background: #064e3b; color: #6ee7b7; }
-  .status-err { background: #7f1d1d; color: #fca5a5; }
+  
+  #status {
+    margin-top: 16px;
+    font-size: 16px;
+    font-weight: 500;
+    min-height: 28px;
+    padding: 12px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+  }
+  .status-idle { color: #64748b; background: transparent; }
+  .status-busy { color: #2563eb; background: #eff6ff; }
+  .status-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .status-err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+  
   #scanDetail {
-    max-width: 480px;
-    margin: 10px auto 0;
-    background: #064e3b;
-    border: 1px solid #10b981;
-    border-radius: 8px;
-    padding: 10px 14px;
+    margin: 12px auto 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 16px;
     text-align: left;
     font-size: 14px;
-    color: #d1fae5;
+    color: #475569;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
   }
-  #scanDetail div { padding: 2px 0; }
-  #scanDetail b { color: #fff; }
+  #scanDetail div { padding: 4px 0; }
+  #scanDetail b { color: #1e293b; }
+  
   #log {
-    max-width: 480px;
-    margin: 12px auto 0;
+    margin: 16px auto 0;
     text-align: left;
     font-size: 13px;
-    color: #9ca3af;
-    max-height: 140px;
+    color: #64748b;
+    max-height: 120px;
     overflow-y: auto;
+    background: rgba(255,255,255,0.5);
+    border-radius: 12px;
+    padding: 10px;
   }
-  #log div { padding: 4px 0; border-bottom: 1px solid #222; }
+  #log div { padding: 6px 4px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+  #log div:last-child { border-bottom: none; }
+  
   button {
+    font-family: 'Prompt', sans-serif;
     font-size: 16px;
-    padding: 12px 24px;
+    font-weight: 500;
+    padding: 12px 28px;
     border: none;
-    border-radius: 8px;
-    background: #10b981;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: #fff;
     cursor: pointer;
-    margin: 4px;
+    margin: 8px 4px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    transition: all 0.2s ease;
   }
+  button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(37, 99, 235, 0.3); }
   button:active { transform: translateY(1px); }
-  button.stop { background: #f59e0b; }
-  .hidden { display: none; }
+  button.stop { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); }
+  button.stop:hover { box-shadow: 0 6px 15px rgba(245, 158, 11, 0.3); }
+  
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
-  <h3>📷 สแกน QR Code เพื่อแจกแสตมป์</h3>
-  <div id="contextInfo"></div>
-  <div id="counter">ยังไม่ได้สแกน</div>
-  <button id="startBtn" onclick="startScan()">เริ่มสแกน QR</button>
-  <button id="stopBtn" class="stop hidden" onclick="stopScan()">หยุดสแกน</button>
-  <div id="reader"></div>
-  <div id="status" class="status-idle"></div>
-  <div id="scanDetail" class="hidden"></div>
-  <div id="log"></div>
+  <div class="scanner-container">
+    <h3>📷 สแกน QR Code เพื่อแจกแสตมป์</h3>
+    <div id="contextInfo"></div>
+    <div id="counter">ยังไม่ได้สแกน</div>
+    <button id="startBtn" onclick="startScan()">เริ่มสแกน QR</button>
+    <button id="stopBtn" class="stop hidden" onclick="stopScan()">หยุดสแกน</button>
+    <div id="reader"></div>
+    <div id="status" class="status-idle"></div>
+    <div id="scanDetail" class="hidden"></div>
+    <div id="log"></div>
+  </div>
 
   <script>
     const statusEl = document.getElementById('status');
@@ -149,7 +198,7 @@
     function addLog(text, ok) {
       const line = document.createElement('div');
       line.textContent = (ok ? '✔ ' : '✘ ') + text;
-      line.style.color = ok ? '#6ee7b7' : '#fca5a5';
+      line.style.color = ok ? '#10b981' : '#ef4444';
       logEl.prepend(line);
     }
 
