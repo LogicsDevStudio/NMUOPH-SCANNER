@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>สแกน QR Code</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<!-- เพิ่ม Google Font Prompt เพื่อความทันสมัย -->
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   body {
@@ -13,7 +12,6 @@
     margin: 0;
     padding: 20px 16px;
     background-color: #f8fafc;
-    /* เพิ่มลวดลายกราฟิก Gradient Mesh สไตล์ Modern Minimalist */
     background-image: 
       radial-gradient(at 10% 20%, hsla(228,100%,74%,0.15) 0px, transparent 50%),
       radial-gradient(at 80% 0%, hsla(189,100%,56%,0.15) 0px, transparent 50%),
@@ -23,7 +21,6 @@
     min-height: 100vh;
   }
   
-  /* สร้าง Container สไตล์ Glassmorphism */
   .scanner-container {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(12px);
@@ -55,12 +52,19 @@
   #counter { font-size: 14px; color: #64748b; margin-bottom: 16px; font-weight: 500; }
   
   #reader { 
-    max-width: 100%; 
+    width: 100%; 
+    max-width: 400px;
     margin: 0 auto; 
     border-radius: 16px; 
     overflow: hidden; 
     box-shadow: 0 8px 20px rgba(0,0,0,0.08);
     border: 2px solid #fff;
+    /* เพิ่ม min-height จองพื้นที่ไว้ ป้องกันหน้าเว็บกระโดด/กระพริบเวลาโหลดวิดีโอ */
+    min-height: 300px; 
+    background-color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   #status {
@@ -126,44 +130,20 @@
   
   .hidden { display: none !important; }
 
-  /* ================= ส่วนที่เพิ่มใหม่: CSS สำหรับการกรอกเลขบัตร ================= */
   .manual-input-container {
     margin-top: 16px;
     padding-top: 16px;
     border-top: 1px dashed rgba(0,0,0,0.1);
   }
-  .manual-input-container h4 {
-    margin: 0 0 8px;
-    font-size: 14px;
-    color: #475569;
-    font-weight: 500;
-  }
-  .manual-input-wrapper {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    align-items: center;
-  }
+  .manual-input-container h4 { margin: 0 0 8px; font-size: 14px; color: #475569; font-weight: 500; }
+  .manual-input-wrapper { display: flex; gap: 8px; justify-content: center; align-items: center; }
   .manual-input {
-    font-family: 'Prompt', sans-serif;
-    font-size: 14px;
-    padding: 10px 16px;
-    border: 1px solid #cbd5e1;
-    border-radius: 50px;
-    width: 60%;
-    outline: none;
-    transition: all 0.3s ease;
-    text-align: center;
+    font-family: 'Prompt', sans-serif; font-size: 14px; padding: 10px 16px;
+    border: 1px solid #cbd5e1; border-radius: 50px; width: 60%; outline: none;
+    transition: all 0.3s ease; text-align: center;
   }
-  .manual-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-  }
-  button.manual-btn {
-    margin: 0;
-    padding: 10px 20px;
-    font-size: 14px;
-  }
+  .manual-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+  button.manual-btn { margin: 0; padding: 10px 20px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -171,19 +151,20 @@
     <h3>📷 สแกน QR Code เพื่อแจกแสตมป์</h3>
     <div id="contextInfo"></div>
     <div id="counter">ยังไม่ได้สแกน</div>
-    <!-- แก้ปัญหาหน้าเว็บกระพริบด้วยการเติม type="button" -->
-    <button type="button" id="startBtn" onclick="startScan()">เริ่มสแกน QR</button>
-    <button type="button" id="stopBtn" class="stop hidden" onclick="stopScan()">หยุดสแกน</button>
-    <div id="reader"></div>
+    
+    <!-- ส่ง event ไปยังฟังก์ชันเพื่อเรียก preventDefault() -->
+    <button type="button" id="startBtn" onclick="startScan(event)">เริ่มสแกน QR</button>
+    <button type="button" id="stopBtn" class="stop hidden" onclick="stopScan(event)">หยุดสแกน</button>
+    
+    <div id="reader">กดปุ่มเริ่มสแกนด้านบน</div>
     <div id="status" class="status-idle"></div>
     <div id="scanDetail" class="hidden"></div>
     
-    <!-- ================= ส่วนที่เพิ่มใหม่: HTML สำหรับกรอกเลขบัตร ================= -->
     <div class="manual-input-container">
       <h4>✍️ หรือกรอกเลขบัตรประชาชน (13 หลัก)</h4>
       <div class="manual-input-wrapper">
         <input type="text" id="manualNatId" class="manual-input" placeholder="เลขบัตรประชาชน" maxlength="13">
-        <button type="button" id="manualSubmitBtn" class="manual-btn" onclick="submitManualId()">ยืนยัน</button>
+        <button type="button" id="manualSubmitBtn" class="manual-btn" onclick="submitManualId(event)">ยืนยัน</button>
       </div>
     </div>
 
@@ -199,7 +180,6 @@
     const contextInfoEl = document.getElementById('contextInfo');
     const detailEl = document.getElementById('scanDetail');
 
-    // แสดงข้อมูลคนที่เพิ่งได้รับแสตมป์ (เลขบัตร / ชื่อ-นามสกุล / เวลาที่ได้รับ) ใต้กล่องแจ้งเตือน
     function renderDetail(d) {
       const fullName = [d.firstName, d.lastName].filter(Boolean).join(' ');
       let html = '';
@@ -214,7 +194,6 @@
       }
     }
 
-    // แสดงชื่ออีเวนต์/บูธที่กำลังแจกแต้มอยู่ ให้เจ้าหน้าที่รู้ว่ากำลังสแกนให้อะไรอยู่
     function renderContext(eventName, boothName) {
       if (!eventName && !boothName) { contextInfoEl.innerHTML = ''; return; }
       contextInfoEl.innerHTML =
@@ -223,7 +202,6 @@
         (boothName ? '📍 บูธ: <b>' + boothName + '</b>' : '');
     }
 
-    // ตอนเปิดหน้าต่างนี้ หน้าหลักจะแนบชื่ออีเวนต์/บูธมาทาง query string (?event=...&booth=...)
     (function initContextFromUrl() {
       const urlParams = new URLSearchParams(window.location.search);
       renderContext(urlParams.get('event') || '', urlParams.get('booth') || '');
@@ -232,12 +210,9 @@
     let scanner = null;
     let isScanning = false;
     let successCount = 0;
-
-    // กันสแกนโค้ดเดิมซ้ำถี่ๆ ขณะ QR ยังค้างอยู่หน้ากล้อง (เช่นคนยังไม่ทันเอาบัตรออก)
     let lastCode = null;
     let lastCodeTime = 0;
     const SAME_CODE_COOLDOWN_MS = 4000;
-    // กันการยิงซ้อนระหว่างรอผลลัพธ์จากแอปหลัก
     let awaitingResult = false;
 
     function setStatus(text, cls) {
@@ -252,11 +227,16 @@
       logEl.prepend(line);
     }
 
-    function startScan() {
+    // เพิ่มการรับ parameter event
+    function startScan(e) {
+      if (e) e.preventDefault(); // ป้องกันพฤติกรรมดั้งเดิมของเบราว์เซอร์
       if (isScanning) return;
+      
       startBtn.classList.add('hidden');
       stopBtn.classList.remove('hidden');
       setStatus('กำลังขอสิทธิ์กล้อง...', 'status-busy');
+
+      document.getElementById('reader').innerText = ''; // ล้างข้อความ
 
       scanner = new Html5Qrcode("reader");
       isScanning = true;
@@ -266,15 +246,16 @@
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (qrText) => {
           const now = Date.now();
-          if (awaitingResult) return; // กำลังรอผลลัพธ์ใบก่อนหน้าอยู่
-          if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return; // โค้ดเดิมซ้ำในช่วงสั้นๆ
+          if (awaitingResult) return; 
+          if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return; 
 
           lastCode = qrText;
           lastCodeTime = now;
           awaitingResult = true;
 
           setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
-          detailEl.classList.add('hidden'); // ซ่อนข้อมูลของคนก่อนหน้า รอผลของคนใหม่
+          detailEl.classList.add('hidden');
+          
           if (window.opener) {
             window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
           } else {
@@ -282,7 +263,7 @@
             awaitingResult = false;
           }
         },
-        (err) => { /* เฟรมที่สแกนไม่เจอ ปกติ ไม่ต้องทำอะไร */ }
+        (err) => { /* Ignore non-fatal frame errors */ }
       ).then(() => {
         setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
       }).catch(err => {
@@ -291,67 +272,62 @@
         stopBtn.classList.add('hidden');
         let msg = 'เปิดกล้องไม่สำเร็จ: ';
         if (err.name === 'NotAllowedError') {
-          msg = 'คุณปฏิเสธสิทธิ์กล้อง หรือเบราว์เซอร์ตั้งค่าบล็อกไว้ กรุณาอนุญาตกล้องแล้วลองใหม่';
+          msg = 'กรุณาอนุญาตให้ใช้งานกล้อง (Allow Camera)';
         } else if (err.name === 'NotFoundError') {
           msg = 'ไม่พบกล้องบนอุปกรณ์นี้';
-        } else if (err.name === 'NotReadableError') {
-          msg = 'กล้องกำลังถูกใช้งานโดยแอปอื่นอยู่';
         } else {
-          msg += (err && err.message) ? err.message : err;
+          msg += err.message || err;
         }
         setStatus(msg, 'status-err');
       });
     }
 
-    function stopScan() {
+    function stopScan(e) {
+      if (e) e.preventDefault();
       startBtn.classList.remove('hidden');
       stopBtn.classList.add('hidden');
       if (scanner && isScanning) {
-        scanner.stop().then(() => { try { scanner.clear(); } catch(e){} }).catch(() => {});
+        scanner.stop().then(() => { 
+          try { scanner.clear(); document.getElementById('reader').innerText = 'กดปุ่มเริ่มสแกนด้านบน'; } catch(err){} 
+        }).catch(() => {});
       }
       isScanning = false;
       setStatus('หยุดสแกนแล้ว', 'status-idle');
     }
 
-    // ================= ส่วนที่เพิ่มใหม่: JS สำหรับจัดการการกรอกเลขบัตร =================
-    function submitManualId() {
-      if (awaitingResult) return; // ป้องกันการกดย้ำขณะรอผลลัพธ์
+    function submitManualId(e) {
+      if (e) e.preventDefault();
+      if (awaitingResult) return;
       
       const natIdInput = document.getElementById('manualNatId');
       const qrText = natIdInput.value.trim();
       
-      // ตรวจสอบความถูกต้องเบื้องต้น (ต้องเป็นตัวเลข 13 หลัก)
       if (!/^\d{13}$/.test(qrText)) {
         setStatus('กรุณากรอกเลขบัตรประชาชนให้เป็นตัวเลข 13 หลัก', 'status-err');
         return;
       }
 
-      // เข้าสู่สถานะรอผลลัพธ์
       awaitingResult = true;
       setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
-      detailEl.classList.add('hidden'); // ซ่อนข้อมูลของคนก่อนหน้า
+      detailEl.classList.add('hidden');
       
       if (window.opener) {
-        // ส่งข้อความกลับไปหาแอปหลักด้วยรูปแบบเดียวกันกับ QR Code
         window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
-        natIdInput.value = ''; // เคลียร์ช่องกรอกหลังจากส่งข้อมูลเรียบร้อยแล้ว
+        natIdInput.value = ''; 
       } else {
         setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
         awaitingResult = false;
       }
     }
 
-    // รับผลลัพธ์ย้อนกลับจากแอปหลัก (สำเร็จ/ไม่สำเร็จ) เพื่อโชว์ในหน้าต่างนี้เลย ไม่ต้องสลับหน้าจอ
     window.addEventListener('message', (event) => {
       if (!event.data) return;
-
-      // กรณีหน้าหลักอัปเดตอีเวนต์/บูธ (เช่น แอดมินเปลี่ยนตัวเลือกระหว่างที่หน้าต่างสแกนเปิดค้างอยู่)
       if (event.data.type === 'update-context') {
         renderContext(event.data.eventName || '', event.data.boothName || '');
         return;
       }
-
       if (event.data.type !== 'scan-feedback') return;
+      
       awaitingResult = false;
 
       if (event.data.success) {
@@ -365,7 +341,6 @@
       }
       addLog(event.data.message, event.data.success);
 
-      // เคลียร์สถานะกลับเป็นพร้อมสแกน หลังโชว์ผลไว้สักครู่ (กล้องยังทำงานต่อเนื่องตลอด ไม่หยุด)
       setTimeout(() => {
         if (isScanning) setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
       }, 1800);
