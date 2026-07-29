@@ -229,42 +229,49 @@
 
     // เพิ่มการรับ parameter event
     function startScan(e) {
-      if (e) e.preventDefault(); // ป้องกันพฤติกรรมดั้งเดิมของเบราว์เซอร์
+      if (e) e.preventDefault();
       if (isScanning) return;
-      
+    
       startBtn.classList.add('hidden');
       stopBtn.classList.remove('hidden');
       setStatus('กำลังขอสิทธิ์กล้อง...', 'status-busy');
-
-      document.getElementById('reader').innerText = ''; // ล้างข้อความ
-
+      document.getElementById('reader').innerText = '';
+    
       scanner = new Html5Qrcode("reader");
       isScanning = true;
-
-      scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (qrText) => {
-          const now = Date.now();
-          if (awaitingResult) return; 
-          if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return; 
-
-          lastCode = qrText;
-          lastCodeTime = now;
-          awaitingResult = true;
-
-          setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
-          detailEl.classList.add('hidden');
-          
-          if (window.opener) {
-            window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
-          } else {
-            setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
-            awaitingResult = false;
-          }
-        },
-        (err) => { /* Ignore non-fatal frame errors */ }
-      ).then(() => {
+    
+      Html5Qrcode.getCameras().then(cameras => {
+        if (!cameras || !cameras.length) {
+          throw { name: 'NotFoundError' };
+        }
+        // เลือกกล้องหลัง: หา label ที่มีคำว่า back/rear/environment ก่อน ถ้าไม่เจอ ใช้ตัวสุดท้าย (มักเป็นกล้องหลังบนมือถือ)
+        const backCam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+    
+        return scanner.start(
+          backCam.id,
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (qrText) => {
+            const now = Date.now();
+            if (awaitingResult) return;
+            if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return;
+    
+            lastCode = qrText;
+            lastCodeTime = now;
+            awaitingResult = true;
+    
+            setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
+            detailEl.classList.add('hidden');
+    
+            if (window.opener) {
+              window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
+            } else {
+              setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
+              awaitingResult = false;
+            }
+          },
+          (err) => { /* Ignore non-fatal frame errors */ }
+        );
+      }).then(() => {
         setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
       }).catch(err => {
         isScanning = false;
