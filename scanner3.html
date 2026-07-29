@@ -15,6 +15,18 @@
     text-align: center;
   }
   h3 { margin-top: 0; margin-bottom: 4px; }
+  #contextInfo {
+    font-size: 13px;
+    color: #d1d5db;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 6px 12px;
+    margin: 0 auto 10px;
+    display: inline-block;
+  }
+  #contextInfo b { color: #34d399; }
+  #contextInfo:empty { display: none; }
   #counter { font-size: 14px; color: #9ca3af; margin-bottom: 12px; }
   #reader { max-width: 480px; margin: 0 auto; border-radius: 8px; overflow: hidden; }
   #status {
@@ -57,6 +69,7 @@
 </head>
 <body>
   <h3>📷 สแกน QR Code เพื่อแจกแสตมป์</h3>
+  <div id="contextInfo"></div>
   <div id="counter">ยังไม่ได้สแกน</div>
   <button id="startBtn" onclick="startScan()">เริ่มสแกน QR</button>
   <button id="stopBtn" class="stop hidden" onclick="stopScan()">หยุดสแกน</button>
@@ -70,6 +83,22 @@
     const logEl = document.getElementById('log');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
+    const contextInfoEl = document.getElementById('contextInfo');
+
+    // แสดงชื่ออีเวนต์/บูธที่กำลังแจกแต้มอยู่ ให้เจ้าหน้าที่รู้ว่ากำลังสแกนให้อะไรอยู่
+    function renderContext(eventName, boothName) {
+      if (!eventName && !boothName) { contextInfoEl.innerHTML = ''; return; }
+      contextInfoEl.innerHTML =
+        (eventName ? '🎫 อีเวนต์: <b>' + eventName + '</b>' : '') +
+        (eventName && boothName ? ' &nbsp;|&nbsp; ' : '') +
+        (boothName ? '📍 บูธ: <b>' + boothName + '</b>' : '');
+    }
+
+    // ตอนเปิดหน้าต่างนี้ หน้าหลักจะแนบชื่ออีเวนต์/บูธมาทาง query string (?event=...&booth=...)
+    (function initContextFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      renderContext(urlParams.get('event') || '', urlParams.get('booth') || '');
+    })();
 
     let scanner = null;
     let isScanning = false;
@@ -156,7 +185,15 @@
 
     // รับผลลัพธ์ย้อนกลับจากแอปหลัก (สำเร็จ/ไม่สำเร็จ) เพื่อโชว์ในหน้าต่างนี้เลย ไม่ต้องสลับหน้าจอ
     window.addEventListener('message', (event) => {
-      if (!event.data || event.data.type !== 'scan-feedback') return;
+      if (!event.data) return;
+
+      // กรณีหน้าหลักอัปเดตอีเวนต์/บูธ (เช่น แอดมินเปลี่ยนตัวเลือกระหว่างที่หน้าต่างสแกนเปิดค้างอยู่)
+      if (event.data.type === 'update-context') {
+        renderContext(event.data.eventName || '', event.data.boothName || '');
+        return;
+      }
+
+      if (event.data.type !== 'scan-feedback') return;
       awaitingResult = false;
 
       if (event.data.success) {
