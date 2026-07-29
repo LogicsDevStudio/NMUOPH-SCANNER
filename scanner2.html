@@ -225,10 +225,11 @@
       logEl.prepend(line);
     }
 
-    // --- แก้บั๊ก: ไม่ใช้ facingMode ตรงๆ (html5-qrcode จะขอกล้อง 2 รอบ: รอบแรก generic
-    //     เพื่อ enumerate อุปกรณ์ แล้วหยุดสตรีมแล้วขอใหม่ด้วย facingMode รอบสอง ทำให้เห็นเป็น
-    //     อาการกระพริบและต้องกดปุ่มซ้ำเพื่อให้ user-gesture ยังคงอยู่ตอนขอสิทธิ์รอบสอง)
-    //     แก้โดยขอสิทธิ์กล้องครั้งเดียวผ่าน getCameras() แล้ว start() ด้วย deviceId ตรงๆ
+    // --- แก้บั๊ก (รอบ 2): getCameras() ก็เรียก getUserMedia() อยู่แล้วข้างใน (ตามเอกสารของ
+    //     ไลบรารี: "This method will trigger user permissions") ดังนั้นการใช้ getCameras()
+    //     แล้วตามด้วย start(deviceId) คือการเรียก getUserMedia() 2 รอบเหมือนเดิม แค่ย้ายจุดเรียก
+    //     ให้ตัด getCameras() ออก แล้วใช้ facingMode ตรงๆ ใน start() ครั้งเดียวแทน
+    //     (ถ้าเครื่องไม่มีกล้องหลังจริงๆ จะ fallback ไปใช้กล้องใดก็ได้ที่มี)
     function startScan(e) {
       if (e) e.preventDefault();
       if (isScanning) return;
@@ -242,52 +243,55 @@
       scanner = new Html5Qrcode("reader");
       isScanning = true;
 
-      Html5Qrcode.getCameras().then(cameras => {
-        if (!cameras || !cameras.length) throw { name: 'NotFoundError' };
-        // เลือกกล้องหลัง: หา label ที่มีคำว่า back/rear/environment ก่อน ถ้าไม่เจอใช้ตัวสุดท้าย
-        // (บนมือถือส่วนใหญ่กล้องหลังจะมาเป็นตัวสุดท้ายในลิสต์)
-        const backCam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+      const qrCallback = (qrText) => {
+        const now = Date.now();
+        if (awaitingResult) return;
+        if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return;
 
-        return scanner.start(
-          backCam.id,
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (qrText) => {
-            const now = Date.now();
-            if (awaitingResult) return;
-            if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return;
+        lastCode = qrText;
+        lastCodeTime = now;
+        awaitingResult = true;
 
-            lastCode = qrText;
-            lastCodeTime = now;
-            awaitingResult = true;
+        setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
+        detailEl.classList.add('hidden');
 
-            setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
-            detailEl.classList.add('hidden');
-
-            if (window.opener) {
-              window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
-            } else {
-              setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
-              awaitingResult = false;
-            }
-          },
-          (err) => { /* Ignore non-fatal frame errors */ }
-        );
-      }).then(() => {
-        setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
-      }).catch(err => {
-        isScanning = false;
-        startBtn.classList.remove('hidden');
-        stopBtn.classList.add('hidden');
-        let msg = 'เปิดกล้องไม่สำเร็จ: ';
-        if (err.name === 'NotAllowedError') {
-          msg = 'กรุณาอนุญาตให้ใช้งานกล้อง (Allow Camera)';
-        } else if (err.name === 'NotFoundError') {
-          msg = 'ไม่พบกล้องบนอุปกรณ์นี้';
+        if (window.opener) {
+          window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
         } else {
-          msg += err.message || err;
+          setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
+          awaitingResult = false;
         }
-        setStatus(msg, 'status-err');
-      });
+      };
+      const frameErrCallback = (err) => { /* Ignore non-fatal frame errors */ };
+      const scanConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+      // เรียก getUserMedia() ครั้งเดียวจริงๆ ผ่าน start() โดยตรง ไม่ผ่าน getCameras() ก่อน
+      scanner.start({ facingMode: { exact: "environment" } }, scanConfig, qrCallback, frameErrCallback)
+        .then(() => {
+          setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
+        })
+        .catch(exactErr => {
+          // เครื่องนี้อาจไม่มีกล้องหลัง (เช่น notebook) หรือไม่รองรับ exact -> ลองแบบ facingMode ทั่วไป
+          // (นี่คือการเรียกซ้ำเฉพาะกรณี fallback เท่านั้น ไม่ใช่ทุกครั้ง)
+          scanner.start({ facingMode: "environment" }, scanConfig, qrCallback, frameErrCallback)
+            .then(() => {
+              setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
+            })
+            .catch(err => {
+              isScanning = false;
+              startBtn.classList.remove('hidden');
+              stopBtn.classList.add('hidden');
+              let msg = 'เปิดกล้องไม่สำเร็จ: ';
+              if (err.name === 'NotAllowedError') {
+                msg = 'กรุณาอนุญาตให้ใช้งานกล้อง (Allow Camera)';
+              } else if (err.name === 'NotFoundError') {
+                msg = 'ไม่พบกล้องบนอุปกรณ์นี้';
+              } else {
+                msg += err.message || err;
+              }
+              setStatus(msg, 'status-err');
+            });
+        });
     }
 
     function stopScan(e) {
