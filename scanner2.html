@@ -59,7 +59,6 @@
     overflow: hidden; 
     box-shadow: 0 8px 20px rgba(0,0,0,0.08);
     border: 2px solid #fff;
-    /* เพิ่ม min-height จองพื้นที่ไว้ ป้องกันหน้าเว็บกระโดด/กระพริบเวลาโหลดวิดีโอ */
     min-height: 300px; 
     background-color: #f1f5f9;
     display: flex;
@@ -152,7 +151,6 @@
     <div id="contextInfo"></div>
     <div id="counter">ยังไม่ได้สแกน</div>
     
-    <!-- ส่ง event ไปยังฟังก์ชันเพื่อเรียก preventDefault() -->
     <button type="button" id="startBtn" onclick="startScan(event)">เริ่มสแกน QR</button>
     <button type="button" id="stopBtn" class="stop hidden" onclick="stopScan(event)">หยุดสแกน</button>
     
@@ -227,26 +225,29 @@
       logEl.prepend(line);
     }
 
-    // เพิ่มการรับ parameter event
+    // --- แก้บั๊ก: ไม่ใช้ facingMode ตรงๆ (html5-qrcode จะขอกล้อง 2 รอบ: รอบแรก generic
+    //     เพื่อ enumerate อุปกรณ์ แล้วหยุดสตรีมแล้วขอใหม่ด้วย facingMode รอบสอง ทำให้เห็นเป็น
+    //     อาการกระพริบและต้องกดปุ่มซ้ำเพื่อให้ user-gesture ยังคงอยู่ตอนขอสิทธิ์รอบสอง)
+    //     แก้โดยขอสิทธิ์กล้องครั้งเดียวผ่าน getCameras() แล้ว start() ด้วย deviceId ตรงๆ
     function startScan(e) {
       if (e) e.preventDefault();
       if (isScanning) return;
-    
+
       startBtn.classList.add('hidden');
       stopBtn.classList.remove('hidden');
       setStatus('กำลังขอสิทธิ์กล้อง...', 'status-busy');
+
       document.getElementById('reader').innerText = '';
-    
+
       scanner = new Html5Qrcode("reader");
       isScanning = true;
-    
+
       Html5Qrcode.getCameras().then(cameras => {
-        if (!cameras || !cameras.length) {
-          throw { name: 'NotFoundError' };
-        }
-        // เลือกกล้องหลัง: หา label ที่มีคำว่า back/rear/environment ก่อน ถ้าไม่เจอ ใช้ตัวสุดท้าย (มักเป็นกล้องหลังบนมือถือ)
+        if (!cameras || !cameras.length) throw { name: 'NotFoundError' };
+        // เลือกกล้องหลัง: หา label ที่มีคำว่า back/rear/environment ก่อน ถ้าไม่เจอใช้ตัวสุดท้าย
+        // (บนมือถือส่วนใหญ่กล้องหลังจะมาเป็นตัวสุดท้ายในลิสต์)
         const backCam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
-    
+
         return scanner.start(
           backCam.id,
           { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -254,14 +255,14 @@
             const now = Date.now();
             if (awaitingResult) return;
             if (qrText === lastCode && (now - lastCodeTime) < SAME_CODE_COOLDOWN_MS) return;
-    
+
             lastCode = qrText;
             lastCodeTime = now;
             awaitingResult = true;
-    
+
             setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
             detailEl.classList.add('hidden');
-    
+
             if (window.opener) {
               window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
             } else {
