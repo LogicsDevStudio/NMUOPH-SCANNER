@@ -125,45 +125,6 @@
   button.stop:hover { box-shadow: 0 6px 15px rgba(245, 158, 11, 0.3); }
   
   .hidden { display: none !important; }
-
-  /* ================= ส่วนที่เพิ่มใหม่: CSS สำหรับการกรอกเลขบัตร ================= */
-  .manual-input-container {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px dashed rgba(0,0,0,0.1);
-  }
-  .manual-input-container h4 {
-    margin: 0 0 8px;
-    font-size: 14px;
-    color: #475569;
-    font-weight: 500;
-  }
-  .manual-input-wrapper {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    align-items: center;
-  }
-  .manual-input {
-    font-family: 'Prompt', sans-serif;
-    font-size: 14px;
-    padding: 10px 16px;
-    border: 1px solid #cbd5e1;
-    border-radius: 50px;
-    width: 60%;
-    outline: none;
-    transition: all 0.3s ease;
-    text-align: center;
-  }
-  .manual-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-  }
-  button.manual-btn {
-    margin: 0;
-    padding: 10px 20px;
-    font-size: 14px;
-  }
 </style>
 </head>
 <body>
@@ -176,16 +137,6 @@
     <div id="reader"></div>
     <div id="status" class="status-idle"></div>
     <div id="scanDetail" class="hidden"></div>
-    
-    <!-- ================= ส่วนที่เพิ่มใหม่: HTML สำหรับกรอกเลขบัตร ================= -->
-    <div class="manual-input-container">
-      <h4>✍️ หรือกรอกเลขบัตรประชาชน (13 หลัก)</h4>
-      <div class="manual-input-wrapper">
-        <input type="text" id="manualNatId" class="manual-input" placeholder="เลขบัตรประชาชน" maxlength="13">
-        <button id="manualSubmitBtn" class="manual-btn" onclick="submitManualId()">ยืนยัน</button>
-      </div>
-    </div>
-
     <div id="log"></div>
   </div>
 
@@ -310,34 +261,6 @@
       }
       isScanning = false;
       setStatus('หยุดสแกนแล้ว', 'status-idle');
-    }
-
-    // ================= ส่วนที่เพิ่มใหม่: JS สำหรับจัดการการกรอกเลขบัตร =================
-    function submitManualId() {
-      if (awaitingResult) return; // ป้องกันการกดย้ำขณะรอผลลัพธ์
-      
-      const natIdInput = document.getElementById('manualNatId');
-      const qrText = natIdInput.value.trim();
-      
-      // ตรวจสอบความถูกต้องเบื้องต้น (ต้องเป็นตัวเลข 13 หลัก)
-      if (!/^\d{13}$/.test(qrText)) {
-        setStatus('กรุณากรอกเลขบัตรประชาชนให้เป็นตัวเลข 13 หลัก', 'status-err');
-        return;
-      }
-
-      // เข้าสู่สถานะรอผลลัพธ์
-      awaitingResult = true;
-      setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
-      detailEl.classList.add('hidden'); // ซ่อนข้อมูลของคนก่อนหน้า
-      
-      if (window.opener) {
-        // ส่งข้อความกลับไปหาแอปหลักด้วยรูปแบบเดียวกันกับ QR Code
-        window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
-        natIdInput.value = ''; // เคลียร์ช่องกรอกหลังจากส่งข้อมูลเรียบร้อยแล้ว
-      } else {
-        setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
-        awaitingResult = false;
-      }
     }
 
     // รับผลลัพธ์ย้อนกลับจากแอปหลัก (สำเร็จ/ไม่สำเร็จ) เพื่อโชว์ในหน้าต่างนี้เลย ไม่ต้องสลับหน้าจอ
