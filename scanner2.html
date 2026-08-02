@@ -200,9 +200,20 @@
         (boothName ? '📍 บูธ: <b>' + boothName + '</b>' : '');
     }
 
+    let scanCtx = { eventId: '', boothId: '', staffId: '', key: '', apiUrl: '' };
+
     (function initContextFromUrl() {
       const urlParams = new URLSearchParams(window.location.search);
       renderContext(urlParams.get('event') || '', urlParams.get('booth') || '');
+      scanCtx.eventId = urlParams.get('eventId') || '';
+      scanCtx.boothId = urlParams.get('boothId') || '';
+      scanCtx.staffId = urlParams.get('staffId') || '';
+      scanCtx.key = urlParams.get('key') || '';
+      scanCtx.apiUrl = urlParams.get('apiUrl') || '';
+
+      if (!scanCtx.apiUrl || !scanCtx.eventId || !scanCtx.boothId) {
+        setStatus('ลิงก์นี้ไม่มีข้อมูลอีเวนต์/บูธ กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
+      }
     })();
 
     let scanner = null;
@@ -212,6 +223,49 @@
     let lastCodeTime = 0;
     const SAME_CODE_COOLDOWN_MS = 4000;
     let awaitingResult = false;
+
+    // ส่งผลสแกน/กรอกเลขบัตร ไปให้ Apps Script backend ตรงๆ ผ่าน fetch()
+    // ไม่ต้องพึ่งแท็บหลัก/window.opener อีกต่อไป จึงเปิดหน้านี้แท็บเดียวก็ใช้งานได้ครบ
+    function submitScan(qrText) {
+      if (!scanCtx.apiUrl || !scanCtx.eventId || !scanCtx.boothId) {
+        setStatus('ลิงก์นี้ไม่มีข้อมูลอีเวนต์/บูธ กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
+        awaitingResult = false;
+        return;
+      }
+
+      const url = scanCtx.apiUrl
+        + '?action=scan'
+        + '&natId=' + encodeURIComponent(qrText)
+        + '&eventId=' + encodeURIComponent(scanCtx.eventId)
+        + '&boothId=' + encodeURIComponent(scanCtx.boothId)
+        + '&staffId=' + encodeURIComponent(scanCtx.staffId)
+        + '&key=' + encodeURIComponent(scanCtx.key);
+
+      fetch(url)
+        .then(r => r.json())
+        .then(res => {
+          awaitingResult = false;
+          if (res.success) {
+            successCount++;
+            counterEl.textContent = 'สแกนสำเร็จแล้ว ' + successCount + ' คน';
+            setStatus('✔ ' + res.message, 'status-ok');
+            renderDetail({ natId: qrText, firstName: res.firstName, lastName: res.lastName, receivedAt: res.receivedAt });
+          } else {
+            setStatus('✘ ' + res.message, 'status-err');
+            detailEl.classList.add('hidden');
+          }
+          addLog(res.message, res.success);
+          setTimeout(() => {
+            if (isScanning) setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
+          }, 1800);
+        })
+        .catch(err => {
+          awaitingResult = false;
+          const msg = 'เชื่อมต่อเซิร์ฟเวอร์ล้มเหลว: ' + err.message;
+          setStatus('✘ ' + msg, 'status-err');
+          addLog(msg, false);
+        });
+    }
 
     function setStatus(text, cls) {
       statusEl.textContent = text;
@@ -254,13 +308,7 @@
 
         setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
         detailEl.classList.add('hidden');
-
-        if (window.opener) {
-          window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
-        } else {
-          setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
-          awaitingResult = false;
-        }
+        submitScan(qrText);
       };
       const frameErrCallback = (err) => { /* Ignore non-fatal frame errors */ };
       const scanConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
@@ -322,41 +370,9 @@
       awaitingResult = true;
       setStatus('กำลังตรวจสอบข้อมูล...', 'status-busy');
       detailEl.classList.add('hidden');
-      
-      if (window.opener) {
-        window.opener.postMessage({ type: 'qr-scan-result', qrText: qrText }, '*');
-        natIdInput.value = ''; 
-      } else {
-        setStatus('ไม่พบหน้าต่างหลัก กรุณาเปิดจากปุ่มในระบบเท่านั้น', 'status-err');
-        awaitingResult = false;
-      }
+      natIdInput.value = '';
+      submitScan(qrText);
     }
-
-    window.addEventListener('message', (event) => {
-      if (!event.data) return;
-      if (event.data.type === 'update-context') {
-        renderContext(event.data.eventName || '', event.data.boothName || '');
-        return;
-      }
-      if (event.data.type !== 'scan-feedback') return;
-      
-      awaitingResult = false;
-
-      if (event.data.success) {
-        successCount++;
-        counterEl.textContent = 'สแกนสำเร็จแล้ว ' + successCount + ' คน';
-        setStatus('✔ ' + event.data.message, 'status-ok');
-        renderDetail(event.data);
-      } else {
-        setStatus('✘ ' + event.data.message, 'status-err');
-        detailEl.classList.add('hidden');
-      }
-      addLog(event.data.message, event.data.success);
-
-      setTimeout(() => {
-        if (isScanning) setStatus('พร้อมสแกน — เล็ง QR Code ในกรอบ', 'status-idle');
-      }, 1800);
-    });
 
     window.addEventListener('beforeunload', () => { if (isScanning) stopScan(); });
   </script>
